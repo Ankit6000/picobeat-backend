@@ -45,7 +45,8 @@ def search(q: str):
         'extract_flat': True,
         'default_search': 'ytsearch10',
         'quiet': True,
-        'extractor_args': {'youtube': {'player-client': ['web_embedded', 'web', 'tv']}}
+        'extractor_args': {'youtube': {'player-client': ['web_embedded', 'web', 'tv']}},
+        'cookiefile': 'cookies.txt'
     }
     
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -74,7 +75,8 @@ async def download_and_upload(yt_id: str, title: str):
             'format': 'bestaudio[ext=m4a]/bestaudio',
             'outtmpl': filename,
             'quiet': True,
-            'extractor_args': {'youtube': {'player-client': ['web_embedded', 'web', 'tv']}}
+            'extractor_args': {'youtube': {'player-client': ['web_embedded', 'web', 'tv']}},
+            'cookiefile': 'cookies.txt'
         }
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -112,7 +114,8 @@ async def stream(id: str):
     ydl_opts = {
         'quiet': True, 
         'noplaylist': True,
-        'extractor_args': {'youtube': {'player-client': ['web_embedded', 'web', 'tv']}}
+        'extractor_args': {'youtube': {'player-client': ['web_embedded', 'web', 'tv']}},
+        'cookiefile': 'cookies.txt'
     }
     
     try:
