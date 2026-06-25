@@ -44,7 +44,8 @@ def search(q: str):
         'noplaylist': True,
         'extract_flat': True,
         'default_search': 'ytsearch10',
-        'quiet': True
+        'quiet': True,
+        'extractor_args': {'youtube': {'player_client': ['web_embedded', 'web', 'tv']}}
     }
     
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -73,6 +74,7 @@ async def download_and_upload(yt_id: str, title: str):
             'format': 'bestaudio[ext=m4a]/bestaudio',
             'outtmpl': filename,
             'quiet': True,
+            'extractor_args': {'youtube': {'player_client': ['web_embedded', 'web', 'tv']}}
         }
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -107,7 +109,11 @@ async def stream(id: str):
     # If cached, just return file_id
     # Otherwise we need metadata first
     url = f"https://www.youtube.com/watch?v={id}"
-    ydl_opts = {'quiet': True, 'noplaylist': True}
+    ydl_opts = {
+        'quiet': True, 
+        'noplaylist': True,
+        'extractor_args': {'youtube': {'player_client': ['web_embedded', 'web', 'tv']}}
+    }
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
