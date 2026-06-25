@@ -1,5 +1,5 @@
 fastapi==0.103.2
 uvicorn==0.23.2
-yt-dlp==2024.03.10
+yt-dlp
 python-telegram-bot==20.6
 requests==2.31.0
