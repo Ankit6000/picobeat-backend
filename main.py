@@ -53,26 +53,22 @@ def debug():
 def search(q: str):
     try:
         req = urllib.request.Request(
-            f'https://www.jiosaavn.com/api.php?__call=autocomplete.get&query={urllib.parse.quote(q)}&_format=json&_marker=0&ctx=android',
+            f'https://www.jiosaavn.com/api.php?__call=search.getResults&q={urllib.parse.quote(q)}&p=1&n=15&_format=json&_marker=0&ctx=android',
             headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
         )
         res = json.loads(urllib.request.urlopen(req).read().decode())
         results = []
-        if 'songs' in res and 'data' in res['songs']:
-            for entry in res['songs']['data']:
-                song_url = entry.get('url', '')
+        if 'results' in res:
+            for entry in res['results']:
+                song_url = entry.get('perma_url', '')
                 song_id = song_url.split('/')[-1] if '/' in song_url else song_url
-                artist = 'Unknown Artist'
-                if 'more_info' in entry and 'primary_artists' in entry['more_info']:
-                    artist = entry['more_info']['primary_artists']
-                elif 'description' in entry:
-                    artist = entry['description'].split(' · ')[0].strip() if ' · ' in entry['description'] else entry['description']
+                artist = entry.get('primary_artists', 'Unknown Artist')
                 
                 results.append(SearchResult(
                     id=song_id,
-                    title=entry.get('title', 'Unknown Title'),
+                    title=entry.get('song', 'Unknown Title'),
                     artist=artist,
-                    thumbnail=entry.get('image', '').replace('50x50', '500x500')
+                    thumbnail=entry.get('image', '').replace('50x50', '500x500').replace('150x150', '500x500')
                 ))
         return results
     except Exception as e:
