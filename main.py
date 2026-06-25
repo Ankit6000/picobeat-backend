@@ -116,7 +116,7 @@ async def stream(id: str):
             artist = info.get('uploader', 'Unknown Artist')
             thumbnail = info.get('thumbnails', [{'url': ''}])[0].get('url', '') if info.get('thumbnails') else ''
     except Exception as e:
-        raise HTTPException(status_code=400, detail="Failed to fetch metadata")
+        raise HTTPException(status_code=400, detail=f"Failed to fetch metadata: {str(e)}")
         
     if id in cache:
         file_id = cache[id]
