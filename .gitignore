@@ -1,0 +1,10 @@
+venv/
+__pycache__/
+*.pyc
+.env
+cloudflared.exe
+ffmpeg.exe
+ffmpeg.zip
+ffprobe.exe
+ffmpeg_extracted/
+tunnel.log
