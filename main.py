@@ -6,6 +6,9 @@ import yt_dlp
 from telegram import Bot
 import tempfile
 import logging
+import urllib.request
+import urllib.parse
+import json
 
 app = FastAPI()
 logging.basicConfig(level=logging.INFO)
@@ -18,7 +21,7 @@ if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHANNEL_ID:
 
 bot = Bot(token=TELEGRAM_BOT_TOKEN) if TELEGRAM_BOT_TOKEN else None
 
-# In-memory cache to map youtube_id -> telegram file_id
+# In-memory cache to map jiosaavn_id -> telegram file_id
 cache = {}
 
 class SearchResult(BaseModel):
@@ -48,48 +51,43 @@ def debug():
 
 @app.get("/search")
 def search(q: str):
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'noplaylist': True,
-        'extract_flat': True,
-        'default_search': 'ytsearch10',
-        'quiet': True,
-        'extractor_args': {'youtube': {'player-client': ['web_embedded', 'web', 'tv']}},
-        'cookiefile': 'cookies.txt',
-        'js_runtimes': {'node': {}},
-        'remote_components': ['ejs:github']
-    }
-    
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        try:
-            info = ydl.extract_info(f"ytsearch10:{q}", download=False)
-            results = []
-            if 'entries' in info:
-                for entry in info['entries']:
-                    results.append(SearchResult(
-                        id=entry.get('id'),
-                        title=entry.get('title', 'Unknown Title'),
-                        artist=entry.get('uploader', 'Unknown Artist'),
-                        thumbnail=entry.get('thumbnails', [{'url': ''}])[0].get('url', '') if entry.get('thumbnails') else ''
-                    ))
-            return results
-        except Exception as e:
-            logging.error(f"Search error: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
+    try:
+        req = urllib.request.Request(
+            f'https://www.jiosaavn.com/api.php?__call=autocomplete.get&query={urllib.parse.quote(q)}&_format=json&_marker=0&ctx=android',
+            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+        )
+        res = json.loads(urllib.request.urlopen(req).read().decode())
+        results = []
+        if 'songs' in res and 'data' in res['songs']:
+            for entry in res['songs']['data']:
+                song_url = entry.get('url', '')
+                song_id = song_url.split('/')[-1] if '/' in song_url else song_url
+                artist = 'Unknown Artist'
+                if 'more_info' in entry and 'primary_artists' in entry['more_info']:
+                    artist = entry['more_info']['primary_artists']
+                elif 'description' in entry:
+                    artist = entry['description'].split(' · ')[0].strip() if ' · ' in entry['description'] else entry['description']
+                
+                results.append(SearchResult(
+                    id=song_id,
+                    title=entry.get('title', 'Unknown Title'),
+                    artist=artist,
+                    thumbnail=entry.get('image', '').replace('50x50', '500x500')
+                ))
+        return results
+    except Exception as e:
+        logging.error(f"Search error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-async def download_and_upload(yt_id: str, title: str):
-    url = f"https://www.youtube.com/watch?v={yt_id}"
+async def download_and_upload(song_id: str, title: str):
+    url = f"https://www.jiosaavn.com/song/track/{song_id}"
     
     with tempfile.TemporaryDirectory() as tmpdir:
-        filename = os.path.join(tmpdir, f"{yt_id}.%(ext)s")
+        filename = os.path.join(tmpdir, f"{song_id}.%(ext)s")
         ydl_opts = {
-            'format': 'bestaudio[ext=m4a]/bestaudio',
+            'format': 'bestaudio/best',
             'outtmpl': filename,
-            'quiet': True,
-            'extractor_args': {'youtube': {'player-client': ['web_embedded', 'web', 'tv']}},
-            'cookiefile': 'cookies.txt',
-            'js_runtimes': {'node': {}},
-            'remote_components': ['ejs:github']
+            'quiet': True
         }
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -114,7 +112,7 @@ async def download_and_upload(yt_id: str, title: str):
                     connect_timeout=120
                 )
                 file_id = message.audio.file_id
-                cache[yt_id] = file_id
+                cache[song_id] = file_id
                 return file_id
         else:
             return "dummy_file_id_no_telegram_token"
@@ -122,23 +120,18 @@ async def download_and_upload(yt_id: str, title: str):
 @app.get("/stream", response_model=StreamResult)
 async def stream(id: str):
     # If cached, just return file_id
-    # Otherwise we need metadata first
-    url = f"https://www.youtube.com/watch?v={id}"
+    url = f"https://www.jiosaavn.com/song/track/{id}"
     ydl_opts = {
-        'quiet': True, 
-        'noplaylist': True,
-        'extractor_args': {'youtube': {'player-client': ['web_embedded', 'web', 'tv']}},
-        'cookiefile': 'cookies.txt',
-        'js_runtimes': {'node': {}},
-        'remote_components': ['ejs:github']
+        'quiet': True,
+        'format': 'bestaudio'
     }
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
             title = info.get('title', 'Unknown Title')
-            artist = info.get('uploader', 'Unknown Artist')
-            thumbnail = info.get('thumbnails', [{'url': ''}])[0].get('url', '') if info.get('thumbnails') else ''
+            artist = info.get('artist', 'Unknown Artist')
+            thumbnail = info.get('thumbnail', '')
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to fetch metadata: {str(e)}")
         
