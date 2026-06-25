@@ -46,7 +46,9 @@ def search(q: str):
         'default_search': 'ytsearch10',
         'quiet': True,
         'extractor_args': {'youtube': {'player-client': ['web_embedded', 'web', 'tv']}},
-        'cookiefile': 'cookies.txt'
+        'cookiefile': 'cookies.txt',
+        'js_runtimes': {'node': {}},
+        'remote_components': ['ejs:github']
     }
     
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -76,7 +78,9 @@ async def download_and_upload(yt_id: str, title: str):
             'outtmpl': filename,
             'quiet': True,
             'extractor_args': {'youtube': {'player-client': ['web_embedded', 'web', 'tv']}},
-            'cookiefile': 'cookies.txt'
+            'cookiefile': 'cookies.txt',
+            'js_runtimes': {'node': {}},
+            'remote_components': ['ejs:github']
         }
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -115,7 +119,9 @@ async def stream(id: str):
         'quiet': True, 
         'noplaylist': True,
         'extractor_args': {'youtube': {'player-client': ['web_embedded', 'web', 'tv']}},
-        'cookiefile': 'cookies.txt'
+        'cookiefile': 'cookies.txt',
+        'js_runtimes': {'node': {}},
+        'remote_components': ['ejs:github']
     }
     
     try:
