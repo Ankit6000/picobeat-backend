@@ -37,6 +37,15 @@ class StreamResult(BaseModel):
 def health():
     return {"status": "ok"}
 
+@app.get("/debug")
+def debug():
+    import subprocess
+    try:
+        node_ver = subprocess.check_output(["node", "-v"], stderr=subprocess.STDOUT).decode().strip()
+    except Exception as e:
+        node_ver = f"Error: {e}"
+    return {"node": node_ver}
+
 @app.get("/search")
 def search(q: str):
     ydl_opts = {
