@@ -76,10 +76,20 @@ def search(q: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 async def download_and_upload(song_id: str, title: str):
-    url = f"https://www.jiosaavn.com/song/track/{song_id}"
+    if "|" in song_id:
+        actual_id, custom_title = song_id.split("|", 1)
+    else:
+        actual_id = song_id
+        
+    if actual_id.startswith("http"):
+        url = actual_id
+    else:
+        url = f"https://www.jiosaavn.com/song/track/{actual_id}"
     
     with tempfile.TemporaryDirectory() as tmpdir:
-        filename = os.path.join(tmpdir, f"{song_id}.%(ext)s")
+        # Prevent invalid characters in filename if song_id is a URL
+        safe_filename = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).rstrip()
+        filename = os.path.join(tmpdir, f"{safe_filename}.%(ext)s")
         ydl_opts = {
             'format': 'bestaudio/best',
             'outtmpl': filename,
@@ -116,18 +126,33 @@ async def download_and_upload(song_id: str, title: str):
 @app.get("/stream", response_model=StreamResult)
 async def stream(id: str):
     # If cached, just return file_id
-    url = f"https://www.jiosaavn.com/song/track/{id}"
+    if "|" in id:
+        actual_id, custom_title = id.split("|", 1)
+    else:
+        actual_id = id
+        custom_title = None
+
+    if actual_id.startswith("http"):
+        url = actual_id
+    else:
+        url = f"https://www.jiosaavn.com/song/track/{actual_id}"
+        
     ydl_opts = {
         'quiet': True,
         'format': 'bestaudio'
     }
     
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-            title = info.get('title', 'Unknown Title')
-            artist = info.get('artist', 'Unknown Artist')
-            thumbnail = info.get('thumbnail', '')
+        if url.startswith("http") and "saavncdn" in url:
+            title = custom_title if custom_title else url.split("/")[-1]
+            artist = "Unknown Artist"
+            thumbnail = ""
+        else:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+                title = custom_title if custom_title else info.get('title', 'Unknown Title')
+                artist = info.get('artist', 'Unknown Artist')
+                thumbnail = info.get('thumbnail', '')
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to fetch metadata: {str(e)}")
         
