@@ -13,13 +13,16 @@ import json
 app = FastAPI()
 logging.basicConfig(level=logging.INFO)
 
+from telegram.request import HTTPXRequest
+
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHANNEL_ID = os.getenv("TELEGRAM_CHANNEL_ID")
 
 if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHANNEL_ID:
     logging.warning("TELEGRAM_BOT_TOKEN or TELEGRAM_CHANNEL_ID not set. Uploads will fail.")
 
-bot = Bot(token=TELEGRAM_BOT_TOKEN) if TELEGRAM_BOT_TOKEN else None
+t_request = HTTPXRequest(connection_pool_size=100, read_timeout=120, write_timeout=120, connect_timeout=120, pool_timeout=60.0)
+bot = Bot(token=TELEGRAM_BOT_TOKEN, request=t_request) if TELEGRAM_BOT_TOKEN else None
 
 # In-memory cache to map jiosaavn_id -> telegram file_id
 cache = {}
