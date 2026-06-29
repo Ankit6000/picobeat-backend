@@ -1,29 +1,36 @@
-FROM python:3.10-slim
+FROM node:22-alpine
 
+WORKDIR /build
+
+# Install build deps needed by cobalt
+RUN apk add --no-cache python3 alpine-sdk git
+
+# Clone cobalt source
+RUN git clone --depth 1 https://github.com/imputnet/cobalt.git .
+
+# Enable corepack for pnpm
+RUN corepack enable
+
+# Install dependencies and deploy API
+RUN pnpm install --prod --frozen-lockfile
+RUN pnpm deploy --filter=@imput/cobalt-api --prod /app
+
+# Copy .git for version info  
 WORKDIR /app
+RUN cp -r /build/.git /app/.git
 
-# Install ffmpeg for yt-dlp, nodejs for signature solving, curl+unzip for deno
-RUN apt-get update && apt-get install -y ffmpeg nodejs curl unzip && rm -rf /var/lib/apt/lists/*
+# Clean up build dir to save space
+RUN rm -rf /build
 
-# Install deno (required by yt-dlp 2026+ as default JS runtime)
-RUN curl -fsSL https://deno.land/install.sh | sh
-ENV DENO_INSTALL="/root/.deno"
-ENV PATH="${DENO_INSTALL}/bin:${PATH}"
+# Render uses PORT env var (default 10000)
+# Cobalt uses API_PORT
+ENV API_PORT=10000
+ENV API_URL="https://picobeat-backend.onrender.com/"
+ENV CORS_WILDCARD=1
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# NO Turnstile/JWT vars = no authentication required (open API)
+# This is what makes it work without browser CAPTCHAs
 
-COPY . .
-
-# Hugging Face runs as user 1000. Give permission to /app for downloads
-RUN chown -R 1000:1000 /app
-
-# Environment variables
-ENV TELEGRAM_BOT_TOKEN=""
-ENV TELEGRAM_CHANNEL_ID=""
-
-# Hugging Face REQUIRES port 7860
-ENV PORT=7860
-EXPOSE 7860
-
-CMD uvicorn main:app --host 0.0.0.0 --port $PORT
+USER node
+EXPOSE 10000
+CMD ["node", "src/cobalt"]
