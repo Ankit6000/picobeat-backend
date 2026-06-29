@@ -128,40 +128,52 @@ async def download_and_upload(song_id: str, title: str):
 
 @app.get("/stream")
 async def stream(id: str):
+    import subprocess
+    
     # Build YouTube URL from video ID
     if id.startswith("http"):
         url = id
     else:
         url = f"https://www.youtube.com/watch?v={id}"
     
-    ydl_opts = {
-        'quiet': True,
-        'format': 'bestaudio[ext=m4a]/bestaudio/best',
-        'no_warnings': True,
-        'geo_bypass': True,
-        'extractor_args': {'youtube': {'player_client': ['web', 'web_creator']}},
-    }
-    
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = await asyncio.to_thread(ydl.extract_info, url, False)
-            title = info.get('title', 'Unknown Title')
-            artist = info.get('artist') or info.get('uploader') or info.get('channel', 'Unknown Artist')
-            # Clean " - Topic" suffix from YouTube Music channels
-            if artist.endswith(' - Topic'):
-                artist = artist[:-8]
-            thumbnail = info.get('thumbnail', '')
-            stream_url = info.get('url', '')
-            
-            if not stream_url:
-                raise Exception("yt-dlp returned no stream URL")
-            
-            return {
-                "title": title,
-                "artist": artist,
-                "thumbnail": thumbnail,
-                "stream_url": stream_url
-            }
+        # Use yt-dlp CLI which handles all the latest bypasses automatically
+        result = await asyncio.to_thread(
+            subprocess.run,
+            [
+                'yt-dlp',
+                '--js-runtimes', 'nodejs,deno',
+                '-f', 'bestaudio[ext=m4a]/bestaudio/best',
+                '--geo-bypass',
+                '-j',  # JSON output
+                '--no-download',
+                '--no-warnings',
+                url
+            ],
+            capture_output=True, text=True, timeout=30
+        )
+        
+        if result.returncode != 0:
+            raise Exception(result.stderr.strip() or "yt-dlp failed")
+        
+        info = json.loads(result.stdout)
+        title = info.get('title', 'Unknown Title')
+        artist = info.get('artist') or info.get('uploader') or info.get('channel', 'Unknown Artist')
+        if artist.endswith(' - Topic'):
+            artist = artist[:-8]
+        thumbnail = info.get('thumbnail', '')
+        stream_url = info.get('url', '')
+        
+        if not stream_url:
+            raise Exception("yt-dlp returned no stream URL")
+        
+        return {
+            "title": title,
+            "artist": artist,
+            "thumbnail": thumbnail,
+            "stream_url": stream_url
+        }
     except Exception as e:
         logging.error(f"Stream error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get stream: {str(e)}")
+
