@@ -138,6 +138,8 @@ async def stream(id: str):
         'quiet': True,
         'format': 'bestaudio[ext=m4a]/bestaudio/best',
         'no_warnings': True,
+        'extractor_args': {'youtube': {'player_client': ['mediaconnect']}},
+        'http_headers': {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'},
     }
     
     try:
