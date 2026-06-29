@@ -126,51 +126,40 @@ async def download_and_upload(song_id: str, title: str):
         else:
             return "dummy_file_id_no_telegram_token"
 
-@app.get("/stream", response_model=StreamResult)
+@app.get("/stream")
 async def stream(id: str):
-    # If cached, just return file_id
-    if "|" in id:
-        actual_id, custom_title = id.split("|", 1)
+    # Build YouTube URL from video ID
+    if id.startswith("http"):
+        url = id
     else:
-        actual_id = id
-        custom_title = None
-
-    if actual_id.startswith("http"):
-        url = actual_id
-    else:
-        url = f"https://www.jiosaavn.com/song/track/{actual_id}"
-        
+        url = f"https://www.youtube.com/watch?v={id}"
+    
     ydl_opts = {
         'quiet': True,
-        'format': 'bestaudio'
+        'format': 'bestaudio[ext=m4a]/bestaudio/best',
+        'no_warnings': True,
     }
     
     try:
-        if url.startswith("http") and "saavncdn" in url:
-            title = custom_title if custom_title else url.split("/")[-1]
-            artist = "Unknown Artist"
-            thumbnail = ""
-        else:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=False)
-                title = custom_title if custom_title else info.get('title', 'Unknown Title')
-                artist = info.get('artist', 'Unknown Artist')
-                thumbnail = info.get('thumbnail', '')
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to fetch metadata: {str(e)}")
-        
-    if id in cache:
-        file_id = cache[id]
-    else:
-        try:
-            file_id = await download_and_upload(id, title)
-        except Exception as e:
-            logging.error(f"Download/Upload error: {e}")
-            raise HTTPException(status_code=500, detail=f"Failed to process audio: {str(e)}")
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = await asyncio.to_thread(ydl.extract_info, url, False)
+            title = info.get('title', 'Unknown Title')
+            artist = info.get('artist') or info.get('uploader') or info.get('channel', 'Unknown Artist')
+            # Clean " - Topic" suffix from YouTube Music channels
+            if artist.endswith(' - Topic'):
+                artist = artist[:-8]
+            thumbnail = info.get('thumbnail', '')
+            stream_url = info.get('url', '')
             
-    return StreamResult(
-        title=title,
-        artist=artist,
-        thumbnail=thumbnail,
-        file_id=file_id
-    )
+            if not stream_url:
+                raise Exception("yt-dlp returned no stream URL")
+            
+            return {
+                "title": title,
+                "artist": artist,
+                "thumbnail": thumbnail,
+                "stream_url": stream_url
+            }
+    except Exception as e:
+        logging.error(f"Stream error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get stream: {str(e)}")
